@@ -14,6 +14,14 @@ public class Piece : MonoBehaviour
     public float stepDelay = 0.8f;
     private float stepTime;
 
+    // --- PinkZ custom mechanic (auto sideways drift) ---
+    [Header("PinkZ Drift")]
+    public float driftDelay = 0.35f;   // how often it slides sideways
+    private float driftTime;
+    private int driftDir = 1;          // 1 = right, -1 = left
+    private bool driftEnabled;
+    // ---------------------------------------------------
+
     public void Initialize(Board board, TetrominoData data, Vector3Int spawn)
     {
         this.board = board;
@@ -25,7 +33,13 @@ public class Piece : MonoBehaviour
         data.cells.CopyTo(localCells, 0);
 
         cells = new Vector3Int[localCells.Length];
+
         stepTime = Time.time + stepDelay;
+
+        // PinkZ drift setup
+        driftEnabled = (data.type == PieceType.PinkZ);
+        driftTime = Time.time + driftDelay;
+        driftDir = 1;
 
         UpdateCells();
     }
@@ -36,7 +50,23 @@ public class Piece : MonoBehaviour
 
         board.Clear(this);
 
-        // player input
+        // --- PinkZ drift happens automatically ---
+        if (driftEnabled && Time.time >= driftTime)
+        {
+            driftTime = Time.time + driftDelay;
+
+            // try to drift in current direction
+            bool moved = Move(new Vector2Int(driftDir, 0));
+
+            // if blocked, bounce direction and try once
+            if (!moved)
+            {
+                driftDir *= -1;
+                Move(new Vector2Int(driftDir, 0));
+            }
+        }
+
+        // player input (still works)
         if (Input.GetKeyDown(KeyCode.LeftArrow)) Move(Vector2Int.left);
         if (Input.GetKeyDown(KeyCode.RightArrow)) Move(Vector2Int.right);
         if (Input.GetKeyDown(KeyCode.DownArrow)) Move(Vector2Int.down);
@@ -47,6 +77,7 @@ public class Piece : MonoBehaviour
         if (Time.time >= stepTime)
         {
             stepTime = Time.time + stepDelay;
+
             if (!Move(Vector2Int.down))
                 Lock();
         }
@@ -70,6 +101,7 @@ public class Piece : MonoBehaviour
             UpdateCells();
             return true;
         }
+
         return false;
     }
 
@@ -87,9 +119,7 @@ public class Piece : MonoBehaviour
 
         // rotate 90 degrees
         for (int i = 0; i < localCells.Length; i++)
-        {
             localCells[i] = new Vector2Int(localCells[i].y, -localCells[i].x);
-        }
 
         // basic wall kicks
         if (!board.IsValidPosition(position, localCells))
